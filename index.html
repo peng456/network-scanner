@@ -109,10 +109,11 @@
         }
         .results {
             margin-top: 20px;
-            max-height: 500px;
+            height: 400px;
             overflow-y: auto;
             border: 1px solid #e5e7eb;
             border-radius: 8px;
+            background: #fafafa;
         }
         .result-item {
             padding: 12px 15px;
@@ -122,9 +123,20 @@
             justify-content: space-between;
             align-items: center;
             font-size: 13px;
+            background: white;
+            animation: slideIn 0.3s ease-out;
         }
-        .result-item:last-child { border-bottom: none; }
-        .result-item:hover { background: #f9fafb; }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .result-item:hover { background: #f0f4ff; }
         .result-url {
             color: #667eea;
             font-weight: 600;
@@ -212,15 +224,27 @@
                 <input type="text" id="portsInput" placeholder="端口 (如 43127)" value="43127">
                 <button id="scanBtn" onclick="startScan()">开始扫描</button>
                 <button id="stopBtn" onclick="stopScan()" disabled>停止</button>
+                <button style="background: #f59e0b;" onclick="clearHistory()">清除历史</button>
             </div>
 
             <div class="progress" id="progressSection">
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill"></div>
-                </div>
-                <div class="status">
-                    <span><span class="spinner"></span>扫描中...</span>
-                    <span id="progressNum">0/0</span>
+                <div style="background: #f5f7fa; padding: 20px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="font-size: 14px; margin-bottom: 10px; color: #333;">
+                        <strong>当前扫描:</strong> <span id="currentIP" style="color: #667eea; font-weight: 600;">-</span>
+                    </div>
+                    <div class="progress-bar" style="height: 12px;">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="status" style="margin-top: 10px; font-size: 13px;">
+                        <div>
+                            <span><span class="spinner"></span>扫描进度</span><br>
+                            <span id="progressNum" style="color: #667eea; font-weight: 600; font-size: 16px; margin-top: 5px; display: inline-block;">0/254</span>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="color: #0ea5e9; font-weight: 600; font-size: 16px;">已发现: <span id="foundCount">0</span></div>
+                            <div style="color: #999; font-size: 12px; margin-top: 5px;">预计时间: <span id="estimatedTime">-</span></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -265,7 +289,7 @@
             }
         }
 
-        function addResult(ip, port) {
+        function addResult(ip, port, isOpen) {
             const resultsDiv = document.getElementById('results');
             if (resultsDiv.firstChild?.classList?.contains('empty-state')) {
                 resultsDiv.innerHTML = '';
@@ -273,14 +297,31 @@
 
             const item = document.createElement('div');
             item.className = 'result-item';
-            item.innerHTML = `
-                <span class="result-url">http://${ip}:${port}</span>
-                <div>
-                    <button class="result-btn" onclick="window.open('http://${ip}:${port}')">访问</button>
-                    <button class="result-btn" onclick="copyUrl('http://${ip}:${port}')">复制</button>
-                </div>
-            `;
-            resultsDiv.insertBefore(item, resultsDiv.firstChild);
+
+            if (isOpen) {
+                item.innerHTML = `
+                    <span class="result-url">✅ http://${ip}:${port}</span>
+                    <div>
+                        <button class="result-btn" onclick="window.open('http://${ip}:${port}')">访问</button>
+                        <button class="result-btn" onclick="copyUrl('http://${ip}:${port}')">复制</button>
+                    </div>
+                `;
+                item.style.background = '#f0f9ff';
+                item.style.borderLeft = '3px solid #0ea5e9';
+            } else {
+                item.innerHTML = `
+                    <span class="result-url">❌ ${ip}:${port}</span>
+                    <span style="color:#999; font-size:12px;">无响应</span>
+                `;
+                item.style.background = '#fafafa';
+                item.style.color = '#999';
+            }
+
+            // 追加到底部
+            resultsDiv.appendChild(item);
+
+            // 自动滚动到最新结果
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
         }
 
         function copyUrl(url) {
@@ -311,20 +352,13 @@
         }
 
         async function testPort(ip, port) {
-            try {
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 200);
-
-                await fetch(`http://${ip}:${port}/`, {
-                    signal: controller.signal,
+            // 用 Promise.race 确保一定会超时
+            return Promise.race([
+                fetch(`http://${ip}:${port}/`, {
                     mode: 'no-cors'
-                });
-
-                clearTimeout(timeout);
-                return true;
-            } catch {
-                return false;
-            }
+                }).then(() => true).catch(() => false),
+                new Promise(resolve => setTimeout(() => resolve(false), 200))
+            ]);
         }
 
         async function startScan() {
@@ -336,21 +370,25 @@
                 return;
             }
 
+            scanning = true;
+            document.getElementById('scanBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('progressSection').classList.add('active');
+            document.getElementById('results').innerHTML = '';
+
             if (currentMode === 'server') {
                 if (!ws || ws.readyState !== WebSocket.OPEN) {
                     alert('服务器未连接，请检查是否运行了 npm start');
+                    scanning = false;
+                    document.getElementById('scanBtn').disabled = false;
+                    document.getElementById('stopBtn').disabled = true;
+                    document.getElementById('progressSection').classList.remove('active');
                     return;
                 }
                 ws.send(JSON.stringify({ cmd: 'scan', ip, ports }));
             } else {
                 await browserScan(ip, ports);
             }
-
-            scanning = true;
-            document.getElementById('scanBtn').disabled = true;
-            document.getElementById('stopBtn').disabled = false;
-            document.getElementById('progressSection').classList.add('active');
-            document.getElementById('results').innerHTML = '';
         }
 
         async function browserScan(ipInput, portsInput) {
@@ -359,27 +397,62 @@
             const total = ips.length * ports.length;
             let current = 0;
             let found = 0;
+            const startTime = Date.now();
+
+            // 并行扫描：10 个一批
+            const batchSize = 10;
+            const tasks = [];
 
             for (const ip of ips) {
+                for (const port of ports) {
+                    tasks.push({ ip, port });
+                }
+            }
+
+            for (let i = 0; i < tasks.length; i += batchSize) {
                 if (!scanning) break;
 
-                for (const port of ports) {
-                    if (!scanning) break;
-
-                    const isOpen = await testPort(ip, port);
+                const batch = tasks.slice(i, i + batchSize);
+                const promises = batch.map(async (task) => {
+                    const isOpen = await testPort(task.ip, task.port);
                     current++;
 
-                    if (current % 10 === 0) {
-                        document.getElementById('progressFill').style.width = (current * 100 / total) + '%';
-                        document.getElementById('progressNum').textContent = current + '/' + total;
+                    const percent = Math.round((current * 100) / total);
+                    document.getElementById('progressFill').style.width = percent + '%';
+                    document.getElementById('progressNum').textContent = current + '/' + total;
+                    document.getElementById('currentIP').textContent = task.ip;
+
+                    // 计算预计时间
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    if (elapsed > 0) {
+                        const speed = current / elapsed;
+                        const remaining = (total - current) / speed;
+                        const remainingText = remaining > 60 ? Math.round(remaining / 60) + ' 分' : Math.round(remaining) + ' 秒';
+                        document.getElementById('estimatedTime').textContent = remainingText;
                     }
 
                     if (isOpen) {
-                        addResult(ip, port);
+                        addResult(task.ip, task.port, true);
                         found++;
+                        document.getElementById('foundCount').textContent = found;
                     }
-                }
+                });
+
+                await Promise.all(promises);
             }
+
+            // 扫描完成后保存结果
+            const resultsDiv = document.getElementById('results');
+            const resultItems = resultsDiv.querySelectorAll('.result-item');
+            const results = [];
+            resultItems.forEach(item => {
+                const url = item.querySelector('.result-url').textContent;
+                const match = url.match(/(\d+\.\d+\.\d+\.\d+):(\d+)/);
+                if (match) {
+                    results.push({ ip: match[1], port: match[2] });
+                }
+            });
+            saveResults(results);
 
             finishScan(found);
         }
@@ -402,7 +475,68 @@
             document.getElementById('progressSection').classList.remove('active');
         }
 
-        window.onload = () => updateMode();
+        // 保存结果到 localStorage
+        function saveResults(results) {
+            localStorage.setItem('scanResults', JSON.stringify({
+                timestamp: new Date().toLocaleString(),
+                results: results
+            }));
+        }
+
+        // 从 localStorage 加载结果
+        function loadResults() {
+            const data = localStorage.getItem('scanResults');
+            if (data) {
+                try {
+                    const parsed = JSON.parse(data);
+                    return parsed;
+                } catch (e) {
+                    return null;
+                }
+            }
+            return null;
+        }
+
+        // 清除历史记录
+        function clearHistory() {
+            if (confirm('确定要清除所有历史记录吗？')) {
+                localStorage.removeItem('scanResults');
+                document.getElementById('results').innerHTML = '<div class="empty-state">点击"开始扫描"发现局域网服务</div>';
+            }
+        }
+
+        // 页面加载时显示历史结果
+        window.onload = () => {
+            updateMode();
+
+            const cached = loadResults();
+            if (cached && cached.results && cached.results.length > 0) {
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.innerHTML = '';
+
+                // 显示最后扫描时间
+                const header = document.createElement('div');
+                header.style.cssText = 'padding: 12px 15px; background: #f0f4ff; border-bottom: 1px solid #e5e7eb; color: #667eea; font-size: 12px;';
+                header.textContent = '📋 上次扫描结果：' + cached.timestamp;
+                resultsDiv.appendChild(header);
+
+                // 显示缓存的结果
+                cached.results.forEach(result => {
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+                    item.innerHTML = `
+                        <span class="result-url">✅ http://${result.ip}:${result.port}</span>
+                        <div>
+                            <button class="result-btn" onclick="window.open('http://${result.ip}:${result.port}')">访问</button>
+                            <button class="result-btn" onclick="copyUrl('http://${result.ip}:${result.port}')">复制</button>
+                        </div>
+                    `;
+                    item.style.background = '#f0f9ff';
+                    item.style.borderLeft = '3px solid #0ea5e9';
+                    resultsDiv.appendChild(item);
+                });
+            }
+        };
     </script>
 </body>
 </html>
