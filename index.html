@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
     <title>⚡ 高速网络扫描器</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -221,6 +221,129 @@
             to {
                 opacity: 0;
                 transform: translateX(-50%) translateY(20px);
+            }
+        }
+
+        /* 手机端适配 */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                border-radius: 8px;
+            }
+            .header {
+                padding: 20px 15px;
+            }
+            .header h1 {
+                font-size: 22px;
+                margin-bottom: 5px;
+            }
+            .header p {
+                font-size: 12px;
+            }
+            .content {
+                padding: 20px 15px;
+            }
+            .controls {
+                flex-direction: column;
+                gap: 8px;
+            }
+            input, button, select {
+                padding: 12px;
+                font-size: 16px;  /* 防止 iOS 自动放大 */
+                width: 100%;
+            }
+            button {
+                padding: 14px 12px;
+                min-height: 44px;  /* iOS 推荐 */
+            }
+            .alert {
+                padding: 12px;
+                font-size: 12px;
+                margin-bottom: 15px;
+            }
+            .mode-selector {
+                padding: 12px;
+                margin-bottom: 15px;
+            }
+            .mode-selector label {
+                display: block;
+                margin-bottom: 10px;
+                margin-right: 0;
+            }
+            .progress {
+                margin-bottom: 15px;
+            }
+            .progress-bar {
+                height: 10px;
+            }
+            .status {
+                font-size: 12px;
+                flex-direction: column;
+                gap: 8px;
+            }
+            .results {
+                height: 300px;
+                margin-top: 15px;
+            }
+            .result-item {
+                padding: 10px 12px;
+                font-size: 12px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+            .result-url {
+                word-break: break-all;
+            }
+            .result-item > div {
+                width: 100%;
+                display: flex;
+                gap: 8px;
+            }
+            .result-btn {
+                flex: 1;
+                padding: 8px;
+                font-size: 11px;
+            }
+            .empty-state {
+                padding: 30px 15px;
+                font-size: 13px;
+            }
+            .toast {
+                bottom: 10px;
+                left: 10px;
+                right: 10px;
+                transform: none;
+                padding: 12px 15px;
+                font-size: 13px;
+            }
+            .spinner {
+                width: 14px;
+                height: 14px;
+                border: 1.5px solid #f3f3f3;
+                border-top: 1.5px solid #667eea;
+            }
+        }
+
+        /* 极小屏幕（< 360px） */
+        @media (max-width: 360px) {
+            .header h1 {
+                font-size: 18px;
+            }
+            input, button, select {
+                font-size: 14px;
+                padding: 10px;
+            }
+            .content {
+                padding: 15px 10px;
+            }
+            .results {
+                height: 250px;
+            }
+            .result-item {
+                padding: 8px 10px;
             }
         }
     </style>
