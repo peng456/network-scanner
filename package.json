@@ -1,0 +1,15 @@
+{
+  "name": "network-scanner",
+  "version": "1.0.0",
+  "description": "⚡ 高速网络扫描器 - 快速发现局域网内的开放端口",
+  "main": "scanner-ws.js",
+  "scripts": {
+    "start": "node scanner-ws.js",
+    "dev": "node scanner-ws.js"
+  },
+  "keywords": ["network", "scanner", "port"],
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.2"
+  }
+}

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ 高速网络扫描器</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 { font-size: 28px; margin-bottom: 8px; }
+        .header p { opacity: 0.9; font-size: 14px; }
+        .content {
+            padding: 30px;
+        }
+        .alert {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .alert.info {
+            background: #d1ecf1;
+            border-color: #17a2b8;
+            color: #0c5460;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        input, button, select {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .progress {
+            margin-bottom: 20px;
+            display: none;
+        }
+        .progress.active {
+            display: block;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.2s;
+        }
+        .status {
+            font-size: 13px;
+            color: #666;
+            display: flex;
+            justify-content: space-between;
+        }
+        .results {
+            margin-top: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+        }
+        .result-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e5e7eb;
+            font-family: 'Courier New', monospace;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+        }
+        .result-item:last-child { border-bottom: none; }
+        .result-item:hover { background: #f9fafb; }
+        .result-url {
+            color: #667eea;
+            font-weight: 600;
+        }
+        .result-btn {
+            padding: 4px 12px;
+            font-size: 11px;
+            background: white;
+            color: #667eea;
+            border: 1px solid #667eea;
+            cursor: pointer;
+            border-radius: 3px;
+            margin-left: 10px;
+        }
+        .result-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        .empty-state {
+            padding: 40px 20px;
+            text-align: center;
+            color: #999;
+        }
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .mode-selector {
+            background: #f5f7fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        .mode-selector label {
+            margin-right: 20px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .mode-selector input[type="radio"] {
+            margin-right: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ 高速网络扫描器</h1>
+            <p>快速发现局域网内的开放端口</p>
+        </div>
+        <div class="content">
+            <div class="mode-selector">
+                <strong>🔧 扫描模式:</strong>
+                <label>
+                    <input type="radio" name="mode" value="local" checked onchange="updateMode()">
+                    浏览器扫描 (本地，无需后端)
+                </label>
+                <label>
+                    <input type="radio" name="mode" value="server" onchange="updateMode()">
+                    服务器扫描 (需要本地运行 Node.js)
+                </label>
+            </div>
+
+            <div id="serverAlert" class="alert info" style="display:none;">
+                ℹ️ 已连接到本地扫描服务器 (http://localhost:3334)
+            </div>
+
+            <div id="localAlert" class="alert">
+                ⚠️ <strong>浏览器扫描</strong>：直接在你的浏览器中扫描，速度较慢（1-5 分钟）。<br>
+                想要快速扫描？请安装 Node.js，然后运行：<code style="background:#f0f0f0;padding:2px 6px;">npm install && npm start</code>
+            </div>
+
+            <div class="controls">
+                <input type="text" id="ipInput" placeholder="IP 范围 (如 192.168.1.*)" value="192.168.1.*">
+                <input type="text" id="portsInput" placeholder="端口 (如 43127)" value="43127">
+                <button id="scanBtn" onclick="startScan()">开始扫描</button>
+                <button id="stopBtn" onclick="stopScan()" disabled>停止</button>
+            </div>
+
+            <div class="progress" id="progressSection">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="status">
+                    <span><span class="spinner"></span>扫描中...</span>
+                    <span id="progressNum">0/0</span>
+                </div>
+            </div>
+
+            <div class="results" id="results">
+                <div class="empty-state">点击"开始扫描"发现局域网服务</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let scanning = false;
+        let ws = null;
+        let currentMode = 'local';
+
+        function updateMode() {
+            currentMode = document.querySelector('input[name="mode"]:checked').value;
+            document.getElementById('serverAlert').style.display = currentMode === 'server' ? 'block' : 'none';
+            document.getElementById('localAlert').style.display = currentMode === 'local' ? 'block' : 'none';
+
+            if (currentMode === 'server' && !ws) {
+                connectWs();
+            }
+        }
+
+        function connectWs() {
+            ws = new WebSocket('ws://localhost:3334');
+            ws.onopen = () => console.log('✓ 已连接到服务器');
+            ws.onmessage = (e) => handleServerMessage(JSON.parse(e.data));
+            ws.onerror = () => console.log('✗ 服务器连接失败');
+        }
+
+        function handleServerMessage(msg) {
+            if (msg.type === 'progress') {
+                document.getElementById('progressFill').style.width = msg.percent + '%';
+                document.getElementById('progressNum').textContent = msg.current + '/' + msg.total;
+            }
+            if (msg.type === 'found') {
+                addResult(msg.ip, msg.port);
+            }
+            if (msg.type === 'done') {
+                finishScan(msg.count);
+            }
+        }
+
+        function addResult(ip, port) {
+            const resultsDiv = document.getElementById('results');
+            if (resultsDiv.firstChild?.classList?.contains('empty-state')) {
+                resultsDiv.innerHTML = '';
+            }
+
+            const item = document.createElement('div');
+            item.className = 'result-item';
+            item.innerHTML = `
+                <span class="result-url">http://${ip}:${port}</span>
+                <div>
+                    <button class="result-btn" onclick="window.open('http://${ip}:${port}')">访问</button>
+                    <button class="result-btn" onclick="copyUrl('http://${ip}:${port}')">复制</button>
+                </div>
+            `;
+            resultsDiv.insertBefore(item, resultsDiv.firstChild);
+        }
+
+        function copyUrl(url) {
+            navigator.clipboard.writeText(url).then(() => alert('已复制'));
+        }
+
+        function parseIps(input) {
+            if (input.includes('*')) {
+                const prefix = input.replace('.*', '');
+                const ips = [];
+                for (let i = 1; i <= 254; i++) {
+                    ips.push(`${prefix}.${i}`);
+                }
+                return ips;
+            }
+            return [input];
+        }
+
+        function parsePorts(input) {
+            if (input === 'all') {
+                return Array.from({length: 65535}, (_, i) => i + 1);
+            }
+            if (input.includes('-')) {
+                const [start, end] = input.split('-').map(Number);
+                return Array.from({length: end - start + 1}, (_, i) => start + i);
+            }
+            return [Number(input)];
+        }
+
+        async function testPort(ip, port) {
+            try {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 200);
+
+                await fetch(`http://${ip}:${port}/`, {
+                    signal: controller.signal,
+                    mode: 'no-cors'
+                });
+
+                clearTimeout(timeout);
+                return true;
+            } catch {
+                return false;
+            }
+        }
+
+        async function startScan() {
+            const ip = document.getElementById('ipInput').value.trim();
+            const ports = document.getElementById('portsInput').value.trim();
+
+            if (!ip || !ports) {
+                alert('请输入 IP 和端口');
+                return;
+            }
+
+            if (currentMode === 'server') {
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    alert('服务器未连接，请检查是否运行了 npm start');
+                    return;
+                }
+                ws.send(JSON.stringify({ cmd: 'scan', ip, ports }));
+            } else {
+                await browserScan(ip, ports);
+            }
+
+            scanning = true;
+            document.getElementById('scanBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('progressSection').classList.add('active');
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function browserScan(ipInput, portsInput) {
+            const ips = parseIps(ipInput);
+            const ports = parsePorts(portsInput);
+            const total = ips.length * ports.length;
+            let current = 0;
+            let found = 0;
+
+            for (const ip of ips) {
+                if (!scanning) break;
+
+                for (const port of ports) {
+                    if (!scanning) break;
+
+                    const isOpen = await testPort(ip, port);
+                    current++;
+
+                    if (current % 10 === 0) {
+                        document.getElementById('progressFill').style.width = (current * 100 / total) + '%';
+                        document.getElementById('progressNum').textContent = current + '/' + total;
+                    }
+
+                    if (isOpen) {
+                        addResult(ip, port);
+                        found++;
+                    }
+                }
+            }
+
+            finishScan(found);
+        }
+
+        function finishScan(count) {
+            scanning = false;
+            document.getElementById('scanBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('progressSection').classList.remove('active');
+            alert(`✅ 扫描完成! 找到 ${count} 个服务`);
+        }
+
+        function stopScan() {
+            scanning = false;
+            if (ws && currentMode === 'server') {
+                ws.send(JSON.stringify({ cmd: 'stop' }));
+            }
+            document.getElementById('scanBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('progressSection').classList.remove('active');
+        }
+
+        window.onload = () => updateMode();
+    </script>
+</body>
+</html>
